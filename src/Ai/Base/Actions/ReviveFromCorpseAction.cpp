@@ -296,18 +296,23 @@ GraveyardStruct const* SpiritHealerAction::GetGrave(bool startZone)
 
 bool SpiritHealerAction::Execute(Event /*event*/)
 {
-    Corpse* corpse = bot->GetCorpse();
-    if (!corpse)
+    if (bot->IsAlive() || !bot->HasPlayerFlag(PLAYER_FLAGS_GHOST))
     {
         botAI->TellError("I am not a spirit");
         return false;
     }
 
+    Corpse* corpse = bot->GetCorpse();
     uint32 dCount = AI_VALUE(uint32, "death count");
-    int64 deadTime = time(nullptr) - corpse->GetGhostTime();
+    int64 deadTime = corpse ? time(nullptr) - corpse->GetGhostTime() : 0;
 
     GraveyardStruct const* ClosestGrave =
         GetGrave(dCount > 10 || deadTime > 15 * MINUTE || AI_VALUE(uint8, "durability") < 10);
+
+    if (!ClosestGrave)
+    {
+        return false;
+    }
 
     if (bot->GetDistance2d(ClosestGrave->x, ClosestGrave->y) < sPlayerbotAIConfig.sightDistance)
     {
@@ -332,11 +337,6 @@ bool SpiritHealerAction::Execute(Event /*event*/)
                 return true;
             }
         }
-    }
-
-    if (!ClosestGrave)
-    {
-        return false;
     }
 
     bool moved = false;
