@@ -525,6 +525,17 @@ AiPlayerbot.FleeingEnabled = 1
 # Default: 1 (enabled)
 AiPlayerbot.MaintenanceCommand = 1
 
+# Enable/Disable free durability repair performed by the maintenance command for alt bots.
+# This is the startup default. A bridge command may change the policy in memory until worldserver restarts.
+# Default: 1 (enabled, preserving existing behavior)
+AiPlayerbot.AltMaintenanceRepair = 1
+
+# Minimum controlling master/player level allowed to run maintenance for an alt bot.
+# Valid range: 1-80. This does not restrict random bots.
+# This is the startup default. A bridge command may change the policy in memory until worldserver restarts.
+# Default: 1
+AiPlayerbot.AltMaintenanceMinMasterLevel = 1
+
 # Enable/Disable specific maintenance command functionality for altbots
 # Disable to prevent players from giving free bags, spells, skill levels, etc. to their altbots
 # Default: 1 (enabled)

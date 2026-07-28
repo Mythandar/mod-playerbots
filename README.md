@@ -63,6 +63,27 @@ The [Playerbots Wiki](https://github.com/mod-playerbots/mod-playerbots/wiki) con
 
 Bots are controlled via chat commands. For larger bot groups, this can be cumbersome. Because of this, community members have developed client AddOns to allow controlling bots through the in-game UI. We recommend you check out their projects listed in the [AddOns and Submodules](https://github.com/mod-playerbots/mod-playerbots/wiki/Playerbot-Addons-and-Sub%E2%80%90Modules) page.
 
+## Runtime alt-maintenance policy
+
+Alt-bot maintenance has a small global runtime policy owned by `PlayerbotAIConfig`:
+
+| Setting | Type | Startup configuration | Default | Runtime behavior |
+|---|---|---|---|---|
+| Repair enabled | Boolean | `AiPlayerbot.AltMaintenanceRepair` | Enabled | When disabled, alt maintenance skips free durability repair while all other enabled maintenance steps continue. |
+| Minimum master level | Integer, `1..DEFAULT_MAX_LEVEL` | `AiPlayerbot.AltMaintenanceMinMasterLevel` | `1` | Alt maintenance is rejected when the controlling player/master is below this level. The bot level is not used for this check. |
+
+The policy applies only to alt bots. Random-bot maintenance retains its original behavior. `AiPlayerbot.MaintenanceCommand` remains the server-wide command gate. The other startup-only `AiPlayerbot.AltMaintenance*` switches continue to control their corresponding maintenance operations and are not changed by this runtime policy. `AiPlayerbot.AltMaintenanceRepair` and `AiPlayerbot.AltMaintenanceMinMasterLevel` specifically provide the two runtime fields with their startup defaults.
+
+Configuration values are startup defaults. Runtime changes are held in memory, do not rewrite configuration files, survive player or bot logout, and reset from configuration when worldserver restarts. The policy is one server-global object rather than a per-account, per-owner, or per-bot object. Public access is provided by:
+
+```cpp
+AltMaintenancePolicy const& GetAltMaintenancePolicy() const;
+void SetAltMaintenanceRepairEnabled(bool enabled);
+bool SetAltMaintenanceMinMasterLevel(uint32 level);
+```
+
+The minimum-level setter rejects values outside the core-supported player level range. Callers are expected to use these APIs from normal worldserver script/command execution; the policy does not provide independent cross-thread synchronization. Protocol parsing and addon authorization belong in a companion bridge module, not in `mod-playerbots`.
+
 ## Contributing
 
 This project is still under development. We encourage anyone to make contributions, anything from pull requests to reporting issues. If you encounter any errors or experience crashes, we encourage you [report them as GitHub issues](https://github.com/mod-playerbots/mod-playerbots/issues/new?template=bug_report.md). Your valuable feedback will help us improve this project collaboratively.

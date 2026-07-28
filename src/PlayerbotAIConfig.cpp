@@ -621,6 +621,15 @@ bool PlayerbotAIConfig::Initialize()
     addClassCommand = sConfigMgr->GetOption<int32>("AiPlayerbot.AddClassCommand", 1);
     addClassAccountPoolSize = sConfigMgr->GetOption<int32>("AiPlayerbot.AddClassAccountPoolSize", 50);
     maintenanceCommand = sConfigMgr->GetOption<int32>("AiPlayerbot.MaintenanceCommand", 1);
+    SetAltMaintenanceRepairEnabled(sConfigMgr->GetOption<bool>("AiPlayerbot.AltMaintenanceRepair", true));
+    if (!SetAltMaintenanceMinMasterLevel(
+            sConfigMgr->GetOption<uint32>("AiPlayerbot.AltMaintenanceMinMasterLevel", 1)))
+    {
+        LOG_ERROR("server.loading",
+                  "AiPlayerbot.AltMaintenanceMinMasterLevel must be between 1 and {}. Using the default value 1.",
+                  DEFAULT_MAX_LEVEL);
+        SetAltMaintenanceMinMasterLevel(1);
+    }
 
     altMaintenanceAttunementQs = sConfigMgr->GetOption<bool>("AiPlayerbot.AltMaintenanceAttunementQuests", true);
     altMaintenanceBags = sConfigMgr->GetOption<bool>("AiPlayerbot.AltMaintenanceBags", true);

@@ -181,10 +181,28 @@ bool MaintenanceAction::Execute(Event /*event*/)
         return false;
     }
 
+    bool const isAltBot = botAI->IsAltBot();
+    PlayerbotAIConfig::AltMaintenancePolicy const& policy = sPlayerbotAIConfig.GetAltMaintenancePolicy();
+    if (isAltBot)
+    {
+        Player* const master = GetMaster();
+        if (!master)
+        {
+            botAI->TellError("alt maintenance requires an active master.");
+            return false;
+        }
+
+        if (master->GetLevel() < policy.minMasterLevel)
+        {
+            botAI->TellError("your level is below the configured minimum for alt maintenance.");
+            return false;
+        }
+    }
+
     botAI->TellMaster("I'm maintaining");
     PlayerbotFactory factory(bot, bot->GetLevel());
 
-    if (!botAI->IsAltBot())
+    if (!isAltBot)
     {
         factory.InitAttunementQuests();
         factory.InitBags(false);
@@ -268,7 +286,8 @@ bool MaintenanceAction::Execute(Event /*event*/)
             factory.ApplyEnchantAndGemsNew();
     }
 
-    bot->DurabilityRepairAll(false, 1.0f, false);
+    if (!isAltBot || policy.repairEnabled)
+        bot->DurabilityRepairAll(false, 1.0f, false);
     bot->SendTalentsInfoData(false);
 
     return true;

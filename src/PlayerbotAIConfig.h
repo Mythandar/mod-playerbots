@@ -80,6 +80,12 @@ enum NewRpgStatus : int
 class PlayerbotAIConfig
 {
 public:
+    struct AltMaintenancePolicy
+    {
+        bool repairEnabled = true;
+        uint8 minMasterLevel = 1;
+    };
+
     static PlayerbotAIConfig& instance()
     {
         static PlayerbotAIConfig instance;
@@ -93,6 +99,16 @@ public:
     bool IsPvpProhibited(uint32 zoneId, uint32 areaId);
     bool IsInPvpProhibitedZone(uint32 id);
     bool IsInPvpProhibitedArea(uint32 id);
+    AltMaintenancePolicy const& GetAltMaintenancePolicy() const { return altMaintenancePolicy; }
+    void SetAltMaintenanceRepairEnabled(bool enabled) { altMaintenancePolicy.repairEnabled = enabled; }
+    bool SetAltMaintenanceMinMasterLevel(uint32 level)
+    {
+        if (level < 1 || level > DEFAULT_MAX_LEVEL)
+            return false;
+
+        altMaintenancePolicy.minMasterLevel = static_cast<uint8>(level);
+        return true;
+    }
 
     bool enabled;
     bool disabledWithoutRealPlayer;
@@ -416,6 +432,7 @@ public:
     int32 addClassCommand;
     int32 addClassAccountPoolSize;
     int32 maintenanceCommand;
+    AltMaintenancePolicy altMaintenancePolicy;
     bool altMaintenanceAttunementQs,
             altMaintenanceBags,
             altMaintenanceAmmo,
