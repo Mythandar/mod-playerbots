@@ -1,0 +1,57 @@
+diff --git a/src/PlayerbotAIConfig.h b/src/PlayerbotAIConfig.h
+--- a/src/PlayerbotAIConfig.h
++++ b/src/PlayerbotAIConfig.h
+@@ -379,6 +379,8 @@ public:
+     int32 addClassCommand;
+     int32 addClassAccountPoolSize;
+     int32 maintenanceCommand;
++    uint32 altMaintenanceMinMasterLevel;
++    bool altMaintenanceRepair;
+     bool altMaintenanceAttunementQs,
+             altMaintenanceBags,
+             altMaintenanceAmmo,
+diff --git a/src/PlayerbotAIConfig.cpp b/src/PlayerbotAIConfig.cpp
+--- a/src/PlayerbotAIConfig.cpp
++++ b/src/PlayerbotAIConfig.cpp
+@@ -1318,6 +1318,8 @@ bool PlayerbotAIConfig::Initialize()
+     addClassCommand = sConfigMgr->GetOption<int32>("AiPlayerbot.AddClassCommand", 1);
+     addClassAccountPoolSize = sConfigMgr->GetOption<int32>("AiPlayerbot.AddClassAccountPoolSize", 50);
+     maintenanceCommand = sConfigMgr->GetOption<int32>("AiPlayerbot.MaintenanceCommand", 1);
++    altMaintenanceMinMasterLevel = sConfigMgr->GetOption<uint32>("AiPlayerbot.AltMaintenanceMinMasterLevel", 1);
++    altMaintenanceRepair = sConfigMgr->GetOption<bool>("AiPlayerbot.AltMaintenanceRepair", true);
+ 
+     altMaintenanceAttunementQs = sConfigMgr->GetOption<bool>("AiPlayerbot.AltMaintenanceAttunementQuests", true);
+     altMaintenanceBags = sConfigMgr->GetOption<bool>("AiPlayerbot.AltMaintenanceBags", true);
+diff --git a/src/strategy/actions/TrainerAction.cpp b/src/strategy/actions/TrainerAction.cpp
+--- a/src/strategy/actions/TrainerAction.cpp
++++ b/src/strategy/actions/TrainerAction.cpp
+@@ -183,6 +183,18 @@ bool MaintenanceAction::Execute(Event /*event*/)
+         return false;
+     }
+ 
++    if (botAI->IsAltBot())
++    {
++        Player* const master = GetMaster();
++        if (!master || master->GetLevel() < sPlayerbotAIConfig.altMaintenanceMinMasterLevel)
++        {
++            std::ostringstream out;
++            out << "maintenance requires a master of level "
++                << sPlayerbotAIConfig.altMaintenanceMinMasterLevel << " or higher.";
++            botAI->TellError(out.str());
++            return false;
++        }
++    }
++
+     botAI->TellMaster("I'm maintaining");
+     PlayerbotFactory factory(bot, bot->GetLevel());
+ 
+@@ -270,7 +282,8 @@ bool MaintenanceAction::Execute(Event /*event*/)
+             factory.ApplyEnchantAndGemsNew();
+     }
+ 
+-    bot->DurabilityRepairAll(false, 1.0f, false);
++    if (!botAI->IsAltBot() || sPlayerbotAIConfig.altMaintenanceRepair)
++        bot->DurabilityRepairAll(false, 1.0f, false);
+     bot->SendTalentsInfoData(false);
+ 
+     return true;
