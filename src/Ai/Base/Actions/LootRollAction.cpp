@@ -6,6 +6,7 @@
 
 #include "LootRollAction.h"
 
+#include "DBCStores.h"
 #include "Event.h"
 #include "Group.h"
 #include "ItemUsageValue.h"
@@ -13,6 +14,39 @@
 #include "ObjectMgr.h"
 #include "PlayerbotAIConfig.h"
 #include "Playerbots.h"
+
+namespace
+{
+constexpr uint32 PICK_LOCK_SPELL_ID = 1804;
+
+bool CanAltBotOpenLockbox(PlayerbotAI* botAI, ItemTemplate const* proto)
+{
+    if (!botAI || !proto || !sPlayerbotAIConfig.altBotNeedOnLockboxes || !botAI->IsAltBot())
+        return false;
+
+    Player* bot = botAI->GetBot();
+    if (!bot || bot->getClass() != CLASS_ROGUE || !bot->HasSpell(PICK_LOCK_SPELL_ID) ||
+        !bot->HasSkill(SKILL_LOCKPICKING) || !proto->HasFlag(ITEM_FLAG_HAS_LOOT) || !proto->LockID)
+        return false;
+
+    LockEntry const* lockInfo = sLockStore.LookupEntry(proto->LockID);
+    if (!lockInfo)
+        return false;
+
+    uint32 const lockpickingSkill = bot->GetSkillValue(SKILL_LOCKPICKING);
+    for (uint8 index = 0; index < 8; ++index)
+    {
+        if (lockInfo->Type[index] == LOCK_KEY_SKILL &&
+            SkillByLockType(LockType(lockInfo->Index[index])) == SKILL_LOCKPICKING &&
+            lockpickingSkill >= lockInfo->Skill[index])
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+}
 
 bool LootRollAction::Execute(Event /*event*/)
 {
@@ -49,8 +83,10 @@ bool LootRollAction::Execute(Event /*event*/)
 
         ItemUsage usage = AI_VALUE2(ItemUsage, "item usage", itemUsageParam);
 
+        if (CanAltBotOpenLockbox(botAI, proto))
+            vote = NEED;
         // Armor Tokens are classed as MISC JUNK (Class 15, Subclass 0), luckily no other items I found have class bits and epic quality.
-        if (proto->Class == ITEM_CLASS_MISC && proto->SubClass == ITEM_SUBCLASS_JUNK && proto->Quality == ITEM_QUALITY_EPIC)
+        else if (proto->Class == ITEM_CLASS_MISC && proto->SubClass == ITEM_SUBCLASS_JUNK && proto->Quality == ITEM_QUALITY_EPIC)
         {
             if (CanBotUseToken(proto, bot))
                 vote = NEED; // Eligible for "Need"

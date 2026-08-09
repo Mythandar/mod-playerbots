@@ -380,6 +380,7 @@ public:
     bool lootGreedRollLevel;
     bool lootRollRecipe;
     bool lootRollDisenchant;
+    bool altBotNeedOnLockboxes;
     std::string autoPickReward;
     bool autoEquipUpgradeLoot;
     float equipUpgradeThreshold;
