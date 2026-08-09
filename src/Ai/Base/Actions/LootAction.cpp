@@ -137,7 +137,7 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     if (go && bot->GetDistance(go) > INTERACTION_DISTANCE - 2.0f)
         return false;
 
-    if (go && (go->GetGoState() != GO_STATE_READY))
+    if (go && (go->GetGoState() != GO_STATE_READY || go->getLootState() != GO_READY))
         return false;
 
     // This prevents dungeon chests like Tribunal Chest (Halls of Stone) from being ninja'd by the bots.

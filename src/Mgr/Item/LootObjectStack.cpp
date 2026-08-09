@@ -82,7 +82,8 @@ void LootObject::Refresh(Player* bot, ObjectGuid lootGUID)
     }
 
     GameObject* go = botAI->GetGameObject(lootGUID);
-    if (go && go->isSpawned() && go->GetGoState() == GO_STATE_READY)
+    if (go && go->isSpawned() && go->GetGoState() == GO_STATE_READY &&
+        go->getLootState() == GO_READY)
     {
         bool onlyHasQuestItems = true;
         bool hasAnyQuestItems = false;
