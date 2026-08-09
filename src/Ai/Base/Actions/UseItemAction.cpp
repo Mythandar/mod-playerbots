@@ -69,6 +69,8 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
     if (bot->CanUseItem(item) != EQUIP_ERR_OK)
         return false;
 
+    ItemTemplate const* proto = item->GetTemplate();
+
     if (bot->IsNonMeleeSpellCast(false))
         return false;
 
@@ -80,14 +82,32 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
     uint8 castFlags = 0;
     uint32 targetFlag = TARGET_FLAG_NONE;
     uint32 spellId = 0;
-    for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+
+    // Standard recipe items use spell 483/55884 as an ON_USE wrapper and store
+    // the spell being learned in the following LEARN_SPELL_ID entry. Sending or
+    // validating the learned crafting spell directly prevents the recipe from
+    // being consumed, so mirror the normal client and use only the wrapper.
+    bool const isStandardLearningRecipe =
+        proto->Class == ITEM_CLASS_RECIPE &&
+        (proto->Spells[0].SpellId == 483 || proto->Spells[0].SpellId == 55884) &&
+        proto->Spells[0].SpellTrigger == ITEM_SPELLTRIGGER_ON_USE && proto->Spells[1].SpellId > 0 &&
+        proto->Spells[1].SpellTrigger == ITEM_SPELLTRIGGER_LEARN_SPELL_ID;
+
+    if (isStandardLearningRecipe)
     {
-        if (item->GetTemplate()->Spells[i].SpellId > 0)
+        spellId = proto->Spells[0].SpellId;
+        if (!botAI->CanCastSpell(spellId, bot, false, itemTarget, item))
+            return false;
+    }
+    else
+    {
+        for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
         {
-            spellId = item->GetTemplate()->Spells[i].SpellId;
-            if (!botAI->CanCastSpell(spellId, bot, false, itemTarget, item))
+            if (proto->Spells[i].SpellId > 0)
             {
-                return false;
+                spellId = proto->Spells[i].SpellId;
+                if (!botAI->CanCastSpell(spellId, bot, false, itemTarget, item))
+                    return false;
             }
         }
     }
@@ -145,7 +165,7 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
     }
 
     Player* master = GetMaster();
-    if (!targetSelected && item->GetTemplate()->Class != ITEM_CLASS_CONSUMABLE && master &&
+    if (!targetSelected && !isStandardLearningRecipe && proto->Class != ITEM_CLASS_CONSUMABLE && master &&
         botAI->HasActivePlayerMaster() && !selfOnly)
     {
         if (ObjectGuid masterSelection = master->GetTarget())
@@ -161,7 +181,7 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
         }
     }
 
-    if (!targetSelected && item->GetTemplate()->Class != ITEM_CLASS_CONSUMABLE && unitTarget)
+    if (!targetSelected && !isStandardLearningRecipe && proto->Class != ITEM_CLASS_CONSUMABLE && unitTarget)
     {
         targetFlag = TARGET_FLAG_UNIT;
         packet << targetFlag << unitTarget->GetGUID().WriteAsPacked();
@@ -264,7 +284,6 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
         }
     }
 
-    ItemTemplate const* proto = item->GetTemplate();
     bool isDrink = proto->Spells[0].SpellCategory == 59;
     bool isFood = proto->Spells[0].SpellCategory == 11;
     if (proto->Class == ITEM_CLASS_CONSUMABLE &&
