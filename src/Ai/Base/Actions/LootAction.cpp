@@ -137,7 +137,7 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     if (go && bot->GetDistance(go) > INTERACTION_DISTANCE - 2.0f)
         return false;
 
-    if (go && (go->GetGoState() != GO_STATE_READY))
+    if (go && (go->GetGoState() != GO_STATE_READY || go->getLootState() != GO_READY))
         return false;
 
     // This prevents dungeon chests like Tribunal Chest (Halls of Stone) from being ninja'd by the bots.
@@ -211,9 +211,11 @@ bool OpenLootAction::CanOpenLock(LootObject& /*lootObject*/, SpellInfo const* sp
 {
     for (uint8 effIndex = 0; effIndex <= EFFECT_2; effIndex++)
     {
-        if (spellInfo->Effects[effIndex].Effect != SPELL_EFFECT_OPEN_LOCK &&
-            spellInfo->Effects[effIndex].Effect != SPELL_EFFECT_SKINNING)
-            return false;
+        // Creature gathering spells use SPELL_EFFECT_SKINNING and can share
+        // misc values with gameobject lock types (for example, Herb Gathering
+        // and Pick Lock both use 1). Only open-lock effects can open a GO.
+        if (spellInfo->Effects[effIndex].Effect != SPELL_EFFECT_OPEN_LOCK)
+            continue;
 
         uint32 lockId = go->GetGOInfo()->GetLockId();
         if (!lockId)

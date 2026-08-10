@@ -321,6 +321,13 @@ AiPlayerbot.LootRollRecipe = 0
 # Default: 0 (disabled)
 AiPlayerbot.LootRollDisenchant = 0
 
+# Allow account-owned altbots that can Pick Lock to roll NEED on locked loot containers.
+# Randombots never use this behavior. The bot must be a rogue, know Pick Lock, and
+# have sufficient Lockpicking skill for the container.
+# LootNeedRollLevel still controls whether a NEED decision becomes need, greed, or pass.
+# Default: 1 (enabled)
+AiPlayerbot.AltBotNeedOnLockboxes = 1
+
 # A list of GameObject GUIDs that bots will not interact with.
 # List of default GUIDs:
 # QuestItems:
