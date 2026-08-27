@@ -47,6 +47,7 @@ struct BattlegroundInfo
 class ChatHandler;
 class PerfMonitorOperation;
 class WorldLocation;
+class WorldPosition;
 
 struct CachedEvent
 {
@@ -131,6 +132,7 @@ public:
     void RandomTeleportForLevel(Player* bot);
     void RandomTeleportGrindForLevel(Player* bot);
     void RandomTeleportForRpg(Player* bot);
+    uint32 EvacuateRandomBots(Player* center, float radius, uint32& matched);
     uint32 GetMaxAllowedBotCount();
     bool ProcessBot(Player* player);
     void Revive(Player* player);
@@ -238,6 +240,8 @@ private:
     void ScheduleRandomize(uint32 bot, uint32 time);
     void RandomTeleport(Player* bot);
     void RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth = false);
+    bool RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth, bool ignoreNearbyPlayers,
+                        WorldPosition const* excludedCenter, float excludedRadius);
     uint32 GetZoneLevel(uint16 mapId, float teleX, float teleY, float teleZ);
     typedef void (RandomPlayerbotMgr::*ConsoleCommandHandler)(Player*);
     std::vector<Player*> players;
