@@ -14,11 +14,13 @@
 #include <ctime>
 #include <iomanip>
 #include <random>
+#include <sstream>
 
 #include "AiFactory.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
 #include "ChannelMgr.h"
+#include "Chat.h"
 #include "DBCStores.h"
 #include "DBCStructure.h"
 #include "DatabaseEnv.h"
@@ -1577,25 +1579,32 @@ void RandomPlayerbotMgr::Revive(Player* player)
 
 void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth)
 {
+    RandomTeleport(bot, locs, hearth, false, nullptr, 0.0f);
+}
+
+bool RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth,
+                                        bool ignoreNearbyPlayers, WorldPosition const* excludedCenter,
+                                        float excludedRadius)
+{
     // ignore when alrdy teleported or not in the world yet.
     if (bot->IsBeingTeleported() || !bot->IsInWorld())
-        return;
+        return false;
 
     // no teleport / movement update when rooted.
     if (bot->IsRooted())
-        return;
+        return false;
 
     // ignore when in queue for battle grounds.
     if (bot->InBattlegroundQueue())
-        return;
+        return false;
 
     // ignore when in battle grounds or arena.
     if (bot->InBattleground() || bot->InArena())
-        return;
+        return false;
 
     // ignore when in group (e.g. world, dungeons, raids) and leader is not a player.
     if (bot->GetGroup() && !bot->GetGroup()->IsLeader(bot->GetGUID()))
-        return;
+        return false;
 
     PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
     if (botAI)
@@ -1603,7 +1612,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
         // ignore when in when taxi with boat/zeppelin and has players nearby
         if (bot->HasUnitMovementFlag(MOVEMENTFLAG_ONTRANSPORT) && bot->HasUnitState(UNIT_STATE_IGNORE_PATHFINDING) &&
             botAI->HasPlayerNearby())
-            return;
+            return false;
     }
 
     // if (sPlayerbotAIConfig.randomBotRpgChance < 0)
@@ -1612,7 +1621,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
     if (locs.empty())
     {
         LOG_DEBUG("playerbots", "Cannot teleport bot {} - no locations available", bot->GetName().c_str());
-        return;
+        return false;
     }
 
     std::vector<WorldPosition> tlocs;
@@ -1631,7 +1640,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
     if (tlocs.empty())
     {
         LOG_DEBUG("playerbots", "Cannot teleport bot {} - all locations removed by filter", bot->GetName().c_str());
-        return;
+        return false;
     }
 
     PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_RNDBOT, "RandomTeleportByLocations");
@@ -1640,6 +1649,14 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
     for (uint32 i = 0; i < tlocs.size(); i++)
     {
         WorldLocation loc = tlocs[i];
+
+        if (excludedCenter && excludedRadius > 0.0f && loc.GetMapId() == excludedCenter->GetMapId())
+        {
+            float deltaX = loc.GetPositionX() - excludedCenter->GetPositionX();
+            float deltaY = loc.GetPositionY() - excludedCenter->GetPositionY();
+            if (deltaX * deltaX + deltaY * deltaY <= excludedRadius * excludedRadius)
+                continue;
+        }
 
         float x = loc.GetPositionX();  // + (attemtps > 0 ? urand(0, sPlayerbotAIConfig.grindDistance) -
                                        // sPlayerbotAIConfig.grindDistance / 2 : 0);
@@ -1693,7 +1710,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
         }
 
         // Prevent blink to be detected by visible real players
-        if (botAI->HasPlayerNearby(150.0f))
+        if (!ignoreNearbyPlayers && botAI->HasPlayerNearby(150.0f))
         {
             break;
         }
@@ -1709,7 +1726,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
         if (pmo)
             pmo->finish();
 
-        return;
+        return true;
     }
 
     if (pmo)
@@ -1717,6 +1734,32 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
 
     // LOG_ERROR("playerbots", "Cannot teleport bot {} - no locations available ({} locations)", bot->GetName().c_str(),
     //           tlocs.size());
+    return false;
+}
+
+uint32 RandomPlayerbotMgr::EvacuateRandomBots(Player* center, float radius, uint32& matched)
+{
+    matched = 0;
+    if (!center || !center->IsInWorld() || radius <= 0.0f)
+        return 0;
+
+    WorldPosition excludedCenter(center);
+    uint32 evacuated = 0;
+
+    for (PlayerBotMap::const_iterator it = GetPlayerBotsBegin(); it != GetPlayerBotsEnd(); ++it)
+    {
+        Player* bot = it->second;
+        if (!bot || !IsRandomBot(bot) || !bot->IsInWorld() || bot->GetMapId() != center->GetMapId() ||
+            !center->IsWithinDistInMap(bot, radius))
+            continue;
+
+        ++matched;
+        std::vector<WorldLocation> locations = sTravelMgr.GetTeleportLocations(bot);
+        if (RandomTeleport(bot, locations, false, true, &excludedCenter, radius))
+            ++evacuated;
+    }
+
+    return evacuated;
 }
 
 void RandomPlayerbotMgr::PrepareAddclassCache()
@@ -2364,7 +2407,7 @@ void RandomPlayerbotMgr::SetValue(Player* bot, std::string const& type, uint32 v
     SetValue(bot->GetGUID().GetCounter(), type, value, data);
 }
 
-bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* /*handler*/, char const* args)
+bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, char const* args)
 {
     if (!sPlayerbotAIConfig.enabled)
     {
@@ -2374,11 +2417,39 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* /*handler*/,
 
     if (!args || !*args)
     {
-        LOG_ERROR("playerbots", "Usage: rndbot stats/update/reset/init/refresh/add/remove");
+        LOG_ERROR("playerbots", "Usage: rndbot stats/update/reset/init/refresh/add/remove/evacuate <radius>");
         return false;
     }
 
     std::string const cmd = args;
+
+    std::istringstream commandStream(cmd);
+    std::string action;
+    commandStream >> action;
+    if (action == "evacuate")
+    {
+        uint32 radius = 0;
+        std::string extra;
+        if (!(commandStream >> radius) || (commandStream >> extra) || radius < 25 || radius > 2000)
+        {
+            if (handler)
+                handler->SendSysMessage("Usage: .playerbots rndbot evacuate <radius 25-2000>");
+            return false;
+        }
+
+        if (!handler || !handler->GetSession() || !handler->GetSession()->GetPlayer())
+        {
+            if (handler)
+                handler->SendSysMessage("This command must be used by a player in the world.");
+            return false;
+        }
+
+        uint32 matched = 0;
+        uint32 evacuated =
+            sRandomPlayerbotMgr.EvacuateRandomBots(handler->GetSession()->GetPlayer(), radius, matched);
+        handler->PSendSysMessage("Evacuated {} of {} random bot(s) within {} yards.", evacuated, matched, radius);
+        return true;
+    }
 
     if (cmd == "reset")
     {
